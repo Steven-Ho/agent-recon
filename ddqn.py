@@ -8,20 +8,16 @@ class DDQN:
         self.action_shape = action_shape
         conv1 = tf.keras.layers.Conv2D(16, 11, strides=(3, 3), input_shape=obs_shape)
         pool1 = tf.keras.layers.MaxPooling2D()
-        # pool1 output: 33, 25, 16
         conv2 = tf.keras.layers.Conv2D(32, 5, strides=(1, 1))
         pool2 = tf.keras.layers.MaxPooling2D()
-        # pool2 output: 14, 10, 32
         conv3 = tf.keras.layers.Conv2D(32, 3, strides=(1, 1))
         pool3 = tf.keras.layers.MaxPooling2D()
-        # pool3 output: 14, 10, 32
         flat = tf.keras.layers.Flatten()
         fc1 = tf.keras.layers.Dense(128, activation='relu')
         fc2 = tf.keras.layers.Dense(action_shape)
         self.q1 = tf.keras.Sequential([conv1, pool1, conv2, pool2, conv3, pool3, flat, fc1, fc2])
-        # self.q1 = tf.keras.Sequential([flat, fc1, fc2])
         self.q2 = tf.keras.models.clone_model(self.q1)
-        self.optimizer = tf.keras.optimizers.Adam(0.001)
+        self.optimizer = tf.keras.optimizers.Adam(args.lr)
         self.loss = tf.keras.losses.MeanSquaredError()
 
     @tf.function

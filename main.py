@@ -6,7 +6,17 @@ from ddqn import DDQN
 from buffer import FullReplayMemory
 import itertools
 import time
+import datetime
 # tf.debugging.set_log_device_placement(True)
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        logical_gpus = tf.config.experimental.list_logical_devices('GPU')
+        print(len(gpus), "Physical GPUs, ", len(logical_gpus), "Logical GPUs")
+    except RuntimeError as e:
+        print(e)
 parser = argparse.ArgumentParser(description='Duoble DQN Baseline')
 parser.add_argument('--scenario', type=str, default="Seaquest-v0", help="environment")
 parser.add_argument('--seed', type=int, default=123, help="random seed for env")
@@ -18,6 +28,7 @@ parser.add_argument('--buffer_size', type=int, default=1e6, help='maximum size f
 parser.add_argument('--update_interval', type=int, default=10, help='update q network for every N steps')
 parser.add_argument('--startup_steps', type=int, default=1000, help='initial rollout steps before training')
 parser.add_argument('--batch_size', type=int, default=128, help='sample size for training')
+parser.add_argument('--lr', type=float, default=1e-5, help='learning rate for q networks')
 args = parser.parse_args()
 
 env = gym.make(args.scenario)
@@ -29,7 +40,7 @@ action_shape = env.action_space.n
 
 qnet = DDQN(obs_shape_list, action_shape, args)
 memory = FullReplayMemory(args.buffer_size)
-writer = tf.summary.create_file_writer("logs/{}".format(args.scenario))
+writer = tf.summary.create_file_writer("logs/{}_{}".format(args.scenario, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
 
 total_numsteps = 0
 timestep = 0
