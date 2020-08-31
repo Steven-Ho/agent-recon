@@ -6,17 +6,30 @@ class DDQN:
         self.args = args
         self.obs_shape = obs_shape
         self.action_shape = action_shape
-        conv1 = tf.keras.layers.Conv2D(16, 11, strides=(3, 3), input_shape=obs_shape)
-        pool1 = tf.keras.layers.MaxPooling2D()
-        conv2 = tf.keras.layers.Conv2D(32, 5, strides=(1, 1))
-        pool2 = tf.keras.layers.MaxPooling2D()
-        conv3 = tf.keras.layers.Conv2D(32, 3, strides=(1, 1))
-        pool3 = tf.keras.layers.MaxPooling2D()
-        flat = tf.keras.layers.Flatten()
-        fc1 = tf.keras.layers.Dense(128, activation='relu')
-        fc2 = tf.keras.layers.Dense(action_shape)
-        self.q1 = tf.keras.Sequential([conv1, pool1, conv2, pool2, conv3, pool3, flat, fc1, fc2])
+        self.epsilon = args.epsilon
+        if len(obs_shape)>1:
+            self.model_type = "CNN"
+        else:
+            self.model_type = "DNN"
+        if self.model_type == "CNN":
+            conv1 = tf.keras.layers.Conv2D(16, 11, strides=(3, 3), input_shape=obs_shape)
+            pool1 = tf.keras.layers.MaxPooling2D()
+            conv2 = tf.keras.layers.Conv2D(32, 5, strides=(1, 1))
+            pool2 = tf.keras.layers.MaxPooling2D()
+            conv3 = tf.keras.layers.Conv2D(32, 3, strides=(1, 1))
+            pool3 = tf.keras.layers.MaxPooling2D()
+            flat = tf.keras.layers.Flatten()
+            fc1 = tf.keras.layers.Dense(128, activation='relu')
+            fc2 = tf.keras.layers.Dense(action_shape)
+            self.q1 = tf.keras.Sequential([conv1, pool1, conv2, pool2, conv3, pool3, flat, fc1, fc2])
+        else:
+            fc1 = tf.keras.layers.Dense(128, activation='relu')
+            fc2 = tf.keras.layers.Dense(128, activation='relu')
+            fc3 = tf.keras.layers.Dense(action_shape)
+            self.q1 = tf.keras.Sequential([fc1, fc2, fc3])
         self.q2 = tf.keras.models.clone_model(self.q1)
+        self.q1_target = tf.keras.models.clone_model(self.q1)
+        self.q2_target = tf.keras.models.clone_model(self.q1)
         self.optimizer = tf.keras.optimizers.Adam(args.lr)
         self.loss = tf.keras.losses.MeanSquaredError()
 
@@ -27,27 +40,27 @@ class DDQN:
         return q1, q2
 
     @tf.function
-    def train(self, obs, target):
-        with tf.GradientTape() as tape:
-            q1 = self.q1(obs, training=True)
-            q_loss_1 = self.loss(target, q1)
-            q2 = self.q2(obs, training=True)
-            q_loss_2 = self.loss(target, q2)
+    def forward_t(self, obs, training=False):
+        q1 = self.q1_target(obs, training=training)
+        q2 = self.q2_target(obs, training=training)
+        return q1, q2
 
-        gradients = tape.gradient(q_loss_1, self.q1.trainable_variables)
-        self.optimizer.apply_gradients(zip(gradients, self.q1.trainable_variables))
-        gradients = tape.gradient(q_loss_2, self.q2.trainable_variables)
-        self.optimizer.apply_gradients(zip(gradients, self.q2.trainable_variables))
-    
+    def set_epsilon(self, epsilon):
+        self.epsilon = epsilon
+
+    def update_target(self):
+        self.q1_target.set_weights(self.q1.get_weights())
+        self.q2_target.set_weights(self.q2.get_weights())
+
     def act(self, obs, batch_mode=False):
-        q1, q2 = self.forward(obs)
+        q1, q2 = self.forward_t(obs)
         if batch_mode:
             qs = tf.stack([q1, q2])
         else:
             qs = tf.squeeze(tf.stack([q1, q2]), axis=1)
         qmin = tf.math.reduce_min(qs, axis=0)
         if not batch_mode:
-            if np.random.random()>self.args.epsilon:
+            if np.random.random()>self.epsilon:
                 action = tf.math.argmax(qmin).numpy()
             else:
                 action = np.random.randint(0, high=self.action_shape)
@@ -56,11 +69,10 @@ class DDQN:
             action = tf.expand_dims(tf.math.argmax(qmin, axis=-1), axis=-1)
             return action
 
-    # @tf.function
     def update(self, samples):
         obs, action, reward, done, new_obs = samples
 
-        q1_next, q2_next = self.forward(new_obs, training=False)
+        q1_next, q2_next = self.forward_t(new_obs, training=False)
         qs_next = tf.stack([q1_next, q2_next])
         qmin_next = tf.math.reduce_min(qs_next, axis=0)
         done = done.astype(float)

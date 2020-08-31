@@ -18,17 +18,18 @@ if gpus:
     except RuntimeError as e:
         print(e)
 parser = argparse.ArgumentParser(description='Duoble DQN Baseline')
-parser.add_argument('--scenario', type=str, default="Seaquest-v0", help="environment")
+parser.add_argument('--scenario', type=str, default="Breakout-v0", help="environment (default: Seaquest-v0)")
 parser.add_argument('--seed', type=int, default=123, help="random seed for env")
 parser.add_argument('--num_episodes', type=int, default=40000, help='number of episodes for training')
-parser.add_argument('--max_episode_len', type=int, default=100, help='maximum episode length')
-parser.add_argument('--gamma', type=float, default=0.95, help='discount factor (default: 0.95)')
-parser.add_argument('--epsilon', type=float, default=0.1, help='epsilon-greedy parameter (initial: 0.1)')
+parser.add_argument('--max_episode_len', type=int, default=1000, help='maximum episode length')
+parser.add_argument('--gamma', type=float, default=0.99, help='discount factor (default: 0.95)')
+parser.add_argument('--epsilon', type=float, default=0.5, help='epsilon-greedy parameter (initial: 0.5)')
 parser.add_argument('--buffer_size', type=int, default=1e6, help='maximum size for replay buffer')
 parser.add_argument('--update_interval', type=int, default=10, help='update q network for every N steps')
 parser.add_argument('--startup_steps', type=int, default=1000, help='initial rollout steps before training')
 parser.add_argument('--batch_size', type=int, default=128, help='sample size for training')
-parser.add_argument('--lr', type=float, default=1e-5, help='learning rate for q networks')
+parser.add_argument('--lr', type=float, default=0.00025, help='learning rate for q networks')
+parser.add_argument('--render', action='store_true', help='render or not')
 args = parser.parse_args()
 
 env = gym.make(args.scenario)
@@ -45,6 +46,7 @@ writer = tf.summary.create_file_writer("logs/{}_{}".format(args.scenario, dateti
 total_numsteps = 0
 timestep = 0
 t_start = time.time()
+epsilon = args.epsilon
 
 total_parameters = np.sum([np.prod(v.get_shape().as_list()) for v in qnet.q1.trainable_variables])
 with writer.as_default():
@@ -53,12 +55,21 @@ with writer.as_default():
         obs = env.reset()
         obs = obs/255.
         done = False
-
         episode_reward = 0
         for t in range(args.max_episode_len):
             timestep += 1
+            
+            if timestep % 200000 == 0:
+                epsilon /= 2.
+                qnet.set_epsilon(epsilon)
+                tf.summary.scalar("parameters/epsilon", epsilon, step=timestep)
+                writer.flush()
+            if timestep % 10000 == 0:
+                qnet.update_target()
             action = qnet.act(np.expand_dims(obs, 0))
             new_obs, reward, done, _ = env.step(action)
+            if args.render:
+                env.render()
             new_obs = new_obs/255.
 
             memory.push((obs, action, reward, done, new_obs))
@@ -75,7 +86,10 @@ with writer.as_default():
             episode_reward += reward
             if done:
                 break
-        print("Episode reward: {}".format(episode_reward))
+        print("Episode reward: {}, current time step: {}".format(episode_reward, timestep))
+        tf.summary.scalar("reward/episode_reward", episode_reward, step=i_episode)
+        tf.summary.scalar("reward/episode_length", t, step=i_episode)
+        writer.flush()
         episode_reward = 0
 
 print("End of script.")
