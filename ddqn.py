@@ -12,16 +12,14 @@ class DDQN:
         else:
             self.model_type = "DNN"
         if self.model_type == "CNN":
-            conv1 = tf.keras.layers.Conv2D(16, 11, strides=(3, 3), input_shape=obs_shape)
+            conv1 = tf.keras.layers.Conv2D(16, 5, strides=(3, 3), input_shape=obs_shape)
             pool1 = tf.keras.layers.MaxPooling2D()
-            conv2 = tf.keras.layers.Conv2D(32, 5, strides=(1, 1))
+            conv2 = tf.keras.layers.Conv2D(32, 3, strides=(1, 1))
             pool2 = tf.keras.layers.MaxPooling2D()
-            conv3 = tf.keras.layers.Conv2D(32, 3, strides=(1, 1))
-            pool3 = tf.keras.layers.MaxPooling2D()
             flat = tf.keras.layers.Flatten()
             fc1 = tf.keras.layers.Dense(128, activation='relu')
             fc2 = tf.keras.layers.Dense(action_shape)
-            self.q1 = tf.keras.Sequential([conv1, pool1, conv2, pool2, conv3, pool3, flat, fc1, fc2])
+            self.q1 = tf.keras.Sequential([conv1, pool1, conv2, pool2, flat, fc1, fc2])
         else:
             fc1 = tf.keras.layers.Dense(128, activation='relu')
             fc2 = tf.keras.layers.Dense(128, activation='relu')
@@ -71,6 +69,8 @@ class DDQN:
 
     def update(self, samples):
         obs, action, reward, done, new_obs = samples
+        obs = obs.astype('float32')
+        new_obs = new_obs.astype('float32')
 
         q1_next, q2_next = self.forward_t(new_obs, training=False)
         qs_next = tf.stack([q1_next, q2_next])

@@ -1,5 +1,6 @@
 import gym
 import numpy as np 
+import cv2
 import tensorflow as tf 
 import argparse
 from ddqn import DDQN
@@ -8,6 +9,18 @@ import itertools
 import time
 import datetime
 # tf.debugging.set_log_device_placement(True)
+def make_obs_memory(obs, size=(32, 32)):
+    obs_cv = cv2.cvtColor(obs, cv2.COLOR_RGB2GRAY)
+    obs_resized = cv2.resize(obs_cv, dsize=size, interpolation=cv2.INTER_CUBIC)
+    return obs_resized
+
+def make_obs_network(obs, memory):
+    obs = np.expand_dims(obs, axis=-1)
+    obs_stack = memory.last_obs()
+    obs_stack = np.concatenate([obs, obs_stack], axis=-1)
+    obs_stack = np.expand_dims(obs_stack, axis=0)
+    return obs_stack/255.
+
 gpus = tf.config.experimental.list_physical_devices('GPU')
 if gpus:
     try:
@@ -39,8 +52,9 @@ np.random.seed(args.seed)
 obs_shape_list = env.observation_space.shape
 action_shape = env.action_space.n
 
+obs_shape_list = [32, 32, 4]
 qnet = DDQN(obs_shape_list, action_shape, args)
-memory = FullReplayMemory(args.buffer_size)
+memory = FullReplayMemory(args.buffer_size, obs_shape_list[0:2])
 writer = tf.summary.create_file_writer("logs/{}_{}".format(args.scenario, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
 
 total_numsteps = 0
@@ -53,7 +67,7 @@ with writer.as_default():
     for i_episode in itertools.count(1):
             
         obs = env.reset()
-        obs = obs/255.
+        obs = make_obs_memory(obs)
         done = False
         episode_reward = 0
         for t in range(args.max_episode_len):
@@ -66,11 +80,12 @@ with writer.as_default():
                 writer.flush()
             if timestep % 10000 == 0:
                 qnet.update_target()
-            action = qnet.act(np.expand_dims(obs, 0))
+            obs_net = make_obs_network(obs, memory)
+            action = qnet.act(obs_net)
             new_obs, reward, done, _ = env.step(action)
             if args.render:
                 env.render()
-            new_obs = new_obs/255.
+            new_obs = make_obs_memory(new_obs)
 
             memory.push((obs, action, reward, done, new_obs))
             obs = new_obs
