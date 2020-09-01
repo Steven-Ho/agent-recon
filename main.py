@@ -17,7 +17,7 @@ def make_obs_memory(obs, size=(32, 32)):
 def make_obs_network(obs, memory):
     obs = np.expand_dims(obs, axis=-1)
     obs_stack = memory.last_obs()
-    obs_stack = np.concatenate([obs, obs_stack], axis=-1)
+    obs_stack = np.concatenate([obs_stack, obs], axis=-1)
     obs_stack = np.expand_dims(obs_stack, axis=0)
     return obs_stack/255.
 
@@ -54,7 +54,10 @@ action_shape = env.action_space.n
 
 obs_shape_list = [32, 32, 4]
 qnet = DDQN(obs_shape_list, action_shape, args)
-memory = FullReplayMemory(args.buffer_size, obs_shape_list[0:2])
+kws = ['obs', 'action', 'reward', 'done', 'new_obs']
+shapes = [(32, 32), (1,), (1,), (1,), (32, 32)]
+dtypes = [np.uint8, np.uint8, np.float32, np.bool, np.uint8]
+memory = FullReplayMemory(args.buffer_size, obs_shape_list, kws, shapes, dtypes)
 writer = tf.summary.create_file_writer("logs/{}_{}".format(args.scenario, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
 
 total_numsteps = 0
@@ -87,7 +90,7 @@ with writer.as_default():
                 env.render()
             new_obs = make_obs_memory(new_obs)
 
-            memory.push((obs, action, reward, done, new_obs))
+            memory.push(obs=obs, action=action, reward=reward, done=done, new_obs=new_obs)
             obs = new_obs
 
             if timestep > args.startup_steps:

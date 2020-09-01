@@ -76,7 +76,7 @@ class DDQN:
         qs_next = tf.stack([q1_next, q2_next])
         qmin_next = tf.math.reduce_min(qs_next, axis=0)
         done = done.astype(float)
-        action = np.expand_dims(action, axis=-1)
+        action = np.expand_dims(action, axis=-1).astype(np.int32)
         action_next = self.act(new_obs, batch_mode=True)
         qmin_next_a = tf.gather_nd(qmin_next, action_next, batch_dims=1)
         q_target = reward + self.args.gamma * (1 - done) * qmin_next_a
