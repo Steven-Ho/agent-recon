@@ -9,7 +9,7 @@ import itertools
 import time
 import datetime
 # tf.debugging.set_log_device_placement(True)
-def make_obs_memory(obs, size=(32, 32)):
+def make_obs_memory(obs, size=(48, 48)):
     obs_cv = cv2.cvtColor(obs, cv2.COLOR_RGB2GRAY)
     obs_resized = cv2.resize(obs_cv, dsize=size, interpolation=cv2.INTER_CUBIC)
     return obs_resized
@@ -36,7 +36,7 @@ parser.add_argument('--seed', type=int, default=123, help="random seed for env")
 parser.add_argument('--num_episodes', type=int, default=40000, help='number of episodes for training')
 parser.add_argument('--max_episode_len', type=int, default=1000, help='maximum episode length')
 parser.add_argument('--gamma', type=float, default=0.99, help='discount factor (default: 0.95)')
-parser.add_argument('--epsilon', type=float, default=0.5, help='epsilon-greedy parameter (initial: 0.5)')
+parser.add_argument('--epsilon', type=float, default=0.2, help='epsilon-greedy parameter (initial: 0.5)')
 parser.add_argument('--buffer_size', type=int, default=1e6, help='maximum size for replay buffer')
 parser.add_argument('--update_interval', type=int, default=10, help='update q network for every N steps')
 parser.add_argument('--startup_steps', type=int, default=1000, help='initial rollout steps before training')
@@ -52,10 +52,10 @@ np.random.seed(args.seed)
 obs_shape_list = env.observation_space.shape
 action_shape = env.action_space.n
 
-obs_shape_list = [32, 32, 4]
+obs_shape_list = [48, 48, 4]
 qnet = DDQN(obs_shape_list, action_shape, args)
 kws = ['obs', 'action', 'reward', 'done', 'new_obs']
-shapes = [(32, 32), (1,), (1,), (1,), (32, 32)]
+shapes = [(48, 48), (1,), (1,), (1,), (48, 48)]
 dtypes = [np.uint8, np.uint8, np.float32, np.bool, np.uint8]
 memory = FullReplayMemory(args.buffer_size, obs_shape_list, kws, shapes, dtypes)
 writer = tf.summary.create_file_writer("logs/{}_{}".format(args.scenario, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
@@ -76,7 +76,7 @@ with writer.as_default():
         for t in range(args.max_episode_len):
             timestep += 1
             
-            if timestep % 200000 == 0:
+            if timestep % 200000 == 1:
                 epsilon /= 2.
                 qnet.set_epsilon(epsilon)
                 tf.summary.scalar("parameters/epsilon", epsilon, step=timestep)
