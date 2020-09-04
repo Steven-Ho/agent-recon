@@ -26,8 +26,6 @@ class DDQN:
             fc3 = tf.keras.layers.Dense(action_shape)
             self.q1 = tf.keras.Sequential([fc1, fc2, fc3])
         self.q2 = tf.keras.models.clone_model(self.q1)
-        self.q1_target = tf.keras.models.clone_model(self.q1)
-        self.q2_target = tf.keras.models.clone_model(self.q1)
         self.optimizer = tf.keras.optimizers.Adam(args.lr)
         self.loss = tf.keras.losses.MeanSquaredError()
 
@@ -37,60 +35,49 @@ class DDQN:
         q2 = self.q2(obs, training=training)
         return q1, q2
 
-    @tf.function
-    def forward_t(self, obs, training=False):
-        q1 = self.q1_target(obs, training=training)
-        q2 = self.q2_target(obs, training=training)
-        return q1, q2
-
     def set_epsilon(self, epsilon):
         self.epsilon = epsilon
 
-    def update_target(self):
-        self.q1_target.set_weights(self.q1.get_weights())
-        self.q2_target.set_weights(self.q2.get_weights())
+    def act(self, obs):
+        q1, q2 = self.forward(obs)
+        qs = tf.squeeze(tf.stack([q1, q2]), axis=1)
+        qmean = tf.math.reduce_mean(qs, axis=0)
+        if np.random.random()>self.epsilon:
+            action = tf.math.argmax(qmean, axis=-1).numpy()
+        else:
+            action = np.random.randint(0, high=self.action_shape)
+        return np.array(action)
 
-    def act(self, obs, batch_mode=False):
-        q1, q2 = self.forward_t(obs)
-        if batch_mode:
-            qs = tf.stack([q1, q2])
-        else:
-            qs = tf.squeeze(tf.stack([q1, q2]), axis=1)
-        qmin = tf.math.reduce_min(qs, axis=0)
-        if not batch_mode:
-            if np.random.random()>self.epsilon:
-                action = tf.math.argmax(qmin).numpy()
-            else:
-                action = np.random.randint(0, high=self.action_shape)
-            return np.array(action)
-        else:
-            action = tf.expand_dims(tf.math.argmax(qmin, axis=-1), axis=-1)
-            return action
+    @tf.function
+    def get_action(self, obs, sel):
+        q1, q2 = self.forward(obs)
+        qs = tf.stack([q1, q2], axis=1)
+        q = tf.gather_nd(qs, sel, batch_dims=1)
+        action = tf.math.argmax(q, axis=-1)
+        action = tf.expand_dims(action, axis=-1)
+        return action, q
 
     def update(self, samples):
         obs, action, reward, done, new_obs = samples
         obs = obs.astype('float32')
         new_obs = new_obs.astype('float32')
 
-        q1_next, q2_next = self.forward_t(new_obs, training=False)
-        qs_next = tf.stack([q1_next, q2_next])
-        qmin_next = tf.math.reduce_min(qs_next, axis=0)
+        sel = tf.random.categorical([[0.5, 0.5]], self.args.batch_size)
+        sel = tf.reshape(sel, [self.args.batch_size, 1])
         done = done.astype(float)
         action = np.expand_dims(action, axis=-1).astype(np.int32)
-        action_next = self.act(new_obs, batch_mode=True)
-        qmin_next_a = tf.gather_nd(qmin_next, action_next, batch_dims=1)
-        q_target = reward + self.args.gamma * (1 - done) * qmin_next_a
+        action_next, q_next = self.get_action(new_obs, sel)
+        q_next_a = tf.gather_nd(q_next, action_next, batch_dims=1)
+        q_next_a = tf.expand_dims(q_next_a, axis=-1)
+        q_target = reward + self.args.gamma * (1 - done) * q_next_a
 
-        with tf.GradientTape() as tape1, tf.GradientTape() as tape2:
+        with tf.GradientTape() as tape:
             q1, q2 = self.forward(obs, training=True)
-            q1_a = tf.gather_nd(q1, action, batch_dims=1)
-            q2_a = tf.gather_nd(q2, action, batch_dims=1)
-            q_loss_1 = self.loss(q_target, q1_a)
-            q_loss_2 = self.loss(q_target, q2_a)
+            qs = tf.stack([q1, q2], axis=1)
+            q = tf.gather_nd(qs, 1 - sel, batch_dims=1)
+            q_loss = self.loss(q_target, q)
 
-        gradients = tape1.gradient(q_loss_1, self.q1.trainable_variables)
-        self.optimizer.apply_gradients(zip(gradients, self.q1.trainable_variables))
-        gradients = tape2.gradient(q_loss_2, self.q2.trainable_variables)
-        self.optimizer.apply_gradients(zip(gradients, self.q2.trainable_variables))
+        gradients = tape.gradient(q_loss, self.q1.trainable_variables + self.q2.trainable_variables)
+        self.optimizer.apply_gradients(zip(gradients, self.q1.trainable_variables + self.q2.trainable_variables))
 
-        return q_loss_1.numpy().tolist(), q_loss_2.numpy().tolist()
+        return q_loss.numpy().tolist()
