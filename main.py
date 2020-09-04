@@ -3,7 +3,7 @@ import numpy as np
 import cv2
 import tensorflow as tf 
 import argparse
-from ddqn import DDQN
+from ddqn import DDQN, DQN
 from buffer import FullReplayMemory
 import itertools
 import time
@@ -53,7 +53,7 @@ obs_shape_list = env.observation_space.shape
 action_shape = env.action_space.n
 
 obs_shape_list = [84, 84, 4]
-qnet = DDQN(obs_shape_list, action_shape, args)
+qnet = DQN(obs_shape_list, action_shape, args)
 kws = ['obs', 'action', 'reward', 'done', 'new_obs']
 shapes = [(84, 84), (1,), (1,), (1,), (84, 84)]
 dtypes = [np.uint8, np.uint8, np.float32, np.bool, np.uint8]
@@ -65,7 +65,7 @@ timestep = 0
 t_start = time.time()
 epsilon = args.epsilon
 
-total_parameters = np.sum([np.prod(v.get_shape().as_list()) for v in qnet.q1.trainable_variables])
+total_parameters = np.sum([np.prod(v.get_shape().as_list()) for v in qnet.q.trainable_variables])
 with writer.as_default():
     for i_episode in itertools.count(1):
             

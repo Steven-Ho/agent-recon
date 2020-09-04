@@ -65,7 +65,8 @@ class DQN:
 
         with tf.GradientTape() as tape:
             q = self.forward(obs, training=True)
-            q_loss = self.loss(q_target, q)
+            q_a = tf.gather_nd(q, action, batch_dims=1)
+            q_loss = self.loss(q_target, q_a)
 
         gradients = tape.gradient(q_loss, self.q.trainable_variables)
         self.optimizer.apply_gradients(zip(gradients, self.q.trainable_variables))
@@ -146,7 +147,8 @@ class DDQN:
             q1, q2 = self.forward(obs, training=True)
             qs = tf.stack([q1, q2], axis=1)
             q = tf.gather_nd(qs, 1 - sel, batch_dims=1)
-            q_loss = self.loss(q_target, q)
+            q_a = tf.gather_nd(q, action, batch_dims=1)
+            q_loss = self.loss(q_target, q_a)
 
         gradients = tape.gradient(q_loss, self.q1.trainable_variables + self.q2.trainable_variables)
         self.optimizer.apply_gradients(zip(gradients, self.q1.trainable_variables + self.q2.trainable_variables))
