@@ -153,4 +153,4 @@ class DDQN:
         gradients = tape.gradient(q_loss, self.q1.trainable_variables + self.q2.trainable_variables)
         self.optimizer.apply_gradients(zip(gradients, self.q1.trainable_variables + self.q2.trainable_variables))
 
-        return q_loss.numpy().tolist()
+        return q_loss.numpy().tolist(), tf.math.reduce_mean(q_a).numpy().tolist()
