@@ -56,7 +56,7 @@ class FullReplayMemory(ReplayMemory):
                         else:
                             if self.buffer['done'][indices[j]+i] or indices[j]+i==self.position-1:
                                 valid[j] = False
-                            if not valid:
+                            if not valid[j]:
                                 obs[j,:,:,i-1] = self.obs_default
                             else:
                                 obs[j,:,:,i-1] = self.buffer[kw][indices[j]+i]
