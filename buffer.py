@@ -49,7 +49,7 @@ class FullReplayMemory(ReplayMemory):
                 obs = np.zeros([batch_size] + self.obs_shape + [self.n])
                 obs[:,:,:,-1] = self.buffer[kw][indices]
                 valid = [True for _ in range(batch_size)]
-                for i in range(-1, -4, -1):
+                for i in range(-1, -self.n, -1):
                     for j in range(indices.shape[0]):
                         if indices[j]+i<0:
                             obs[j,:,:,i-1] = self.obs_default

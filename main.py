@@ -43,6 +43,7 @@ parser.add_argument('--startup_steps', type=int, default=10000, help='initial ro
 parser.add_argument('--batch_size', type=int, default=256, help='sample size for training')
 parser.add_argument('--lr', type=float, default=0.00025, help='learning rate for q networks')
 parser.add_argument('--render', action='store_true', help='render or not')
+parser.add_argument('--past_frames', type=int, default=4, help='N frames for q network')
 args = parser.parse_args()
 
 env = gym.make(args.scenario)
@@ -52,7 +53,7 @@ np.random.seed(args.seed)
 obs_shape_list = env.observation_space.shape
 action_shape = env.action_space.n
 
-obs_shape_list = [84, 84, 4]
+obs_shape_list = [84, 84, args.past_frames]
 qnet = DDQN(obs_shape_list, action_shape, args)
 kws = ['obs', 'action', 'reward', 'done', 'new_obs']
 shapes = [(84, 84), (1,), (1,), (1,), (84, 84)]
