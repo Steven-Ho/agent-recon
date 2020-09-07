@@ -39,8 +39,8 @@ parser.add_argument('--gamma', type=float, default=0.99, help='discount factor (
 parser.add_argument('--epsilon', type=float, default=0.2, help='epsilon-greedy parameter (initial: 0.5)')
 parser.add_argument('--buffer_size', type=int, default=1e6, help='maximum size for replay buffer')
 parser.add_argument('--update_interval', type=int, default=10, help='update q network for every N steps')
-parser.add_argument('--startup_steps', type=int, default=1000, help='initial rollout steps before training')
-parser.add_argument('--batch_size', type=int, default=128, help='sample size for training')
+parser.add_argument('--startup_steps', type=int, default=10000, help='initial rollout steps before training')
+parser.add_argument('--batch_size', type=int, default=256, help='sample size for training')
 parser.add_argument('--lr', type=float, default=0.00025, help='learning rate for q networks')
 parser.add_argument('--render', action='store_true', help='render or not')
 args = parser.parse_args()
@@ -53,7 +53,7 @@ obs_shape_list = env.observation_space.shape
 action_shape = env.action_space.n
 
 obs_shape_list = [84, 84, 4]
-qnet = DQN(obs_shape_list, action_shape, args)
+qnet = DDQN(obs_shape_list, action_shape, args)
 kws = ['obs', 'action', 'reward', 'done', 'new_obs']
 shapes = [(84, 84), (1,), (1,), (1,), (84, 84)]
 dtypes = [np.uint8, np.uint8, np.float32, np.bool, np.uint8]
@@ -65,7 +65,7 @@ timestep = 0
 t_start = time.time()
 epsilon = args.epsilon
 
-total_parameters = np.sum([np.prod(v.get_shape().as_list()) for v in qnet.q.trainable_variables])
+# total_parameters = np.sum([np.prod(v.get_shape().as_list()) for v in qnet.q1.trainable_variables])
 with writer.as_default():
     for i_episode in itertools.count(1):
             
@@ -94,8 +94,9 @@ with writer.as_default():
             if timestep > args.startup_steps:
                 if timestep % args.update_interval == 0:
                     obs_b, action_b, reward_b, done_b, new_obs_b = memory.sample(args.batch_size)
-                    lq = qnet.update((obs_b, action_b, reward_b, done_b, new_obs_b))
+                    lq, qs = qnet.update((obs_b, action_b, reward_b, done_b, new_obs_b))
                     tf.summary.scalar("loss/q", lq, step=timestep)
+                    tf.summary.scalar("values/q", qs, step=timestep)
                     writer.flush()
 
             episode_reward += reward

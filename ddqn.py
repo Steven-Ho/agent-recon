@@ -71,7 +71,7 @@ class DQN:
         gradients = tape.gradient(q_loss, self.q.trainable_variables)
         self.optimizer.apply_gradients(zip(gradients, self.q.trainable_variables))
 
-        return q_loss.numpy().tolist()
+        return q_loss.numpy().tolist(), tf.math.reduce_mean(q_a).numpy().tolist()
 
 class DDQN:
     def __init__(self, obs_shape, action_shape, args):
