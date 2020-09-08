@@ -38,7 +38,7 @@ class DQN:
 
     def act(self, obs):
         q = self.forward(obs)
-        if np.random.random()>self.epsilon:
+        if np.random.random()<self.epsilon:
             action = tf.math.argmax(q, axis=-1).numpy()
         else:
             action = np.random.randint(0, high=self.action_shape)
@@ -114,7 +114,7 @@ class DDQN:
         q1, q2 = self.forward(obs)
         qs = tf.squeeze(tf.stack([q1, q2]), axis=1)
         qmean = tf.math.reduce_mean(qs, axis=0)
-        if np.random.random()>self.epsilon:
+        if np.random.random()<self.epsilon:
             action = tf.math.argmax(qmean, axis=-1).numpy()
         else:
             action = np.random.randint(0, high=self.action_shape)

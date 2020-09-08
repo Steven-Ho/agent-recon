@@ -85,5 +85,8 @@ class FullReplayMemory(ReplayMemory):
                 else:
                     obs.insert(0, self.buffer['obs'][i])
         assert len(obs) == self.n-1
-        samples = np.stack(obs, axis=-1)
+        if len(obs)>0:
+            samples = np.stack(obs, axis=-1)
+        else:
+            samples = np.zeros(self.obs_shape+[0], dtype=np.uint8)
         return samples
