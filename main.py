@@ -31,7 +31,7 @@ if gpus:
     except RuntimeError as e:
         print(e)
 parser = argparse.ArgumentParser(description='Duoble DQN Baseline')
-parser.add_argument('--scenario', type=str, default="Centipede-ram-v0", help="environment (default: Seaquest-v0)")
+parser.add_argument('--scenario', type=str, default="Centipede-v0", help="environment (default: Seaquest-v0)")
 parser.add_argument('--seed', type=int, default=123, help="random seed for env")
 parser.add_argument('--num_episodes', type=int, default=40000, help='number of episodes for training')
 parser.add_argument('--max_episode_len', type=int, default=5000, help='maximum episode length')
@@ -41,6 +41,7 @@ parser.add_argument('--buffer_size', type=int, default=1e6, help='maximum size f
 parser.add_argument('--update_interval', type=int, default=10, help='update q network for every N steps')
 parser.add_argument('--startup_steps', type=int, default=10000, help='initial rollout steps before training')
 parser.add_argument('--batch_size', type=int, default=256, help='sample size for training')
+parser.add_argument('--hidden_size', type=int, default=256, help='hidden unit number for network')
 parser.add_argument('--lr', type=float, default=0.00025, help='learning rate for q networks')
 parser.add_argument('--render', action='store_true', help='render or not')
 parser.add_argument('--frames', type=int, default=4, help='N frames for q network')
@@ -90,7 +91,7 @@ with writer.as_default():
                 writer.flush()
             obs_net = make_obs_network(obs, memory)
             if model_type == "CNN":
-                obs_net /= 255.
+                obs_net = obs_net/255.
             action = qnet.act(obs_net)
             new_obs, reward, done, _ = env.step(action)
             if args.render:
