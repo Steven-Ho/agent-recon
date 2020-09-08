@@ -2,15 +2,12 @@ import tensorflow as tf
 import numpy as np 
 
 class DQN:
-    def __init__(self, obs_shape, action_shape, args):
+    def __init__(self, obs_shape, action_shape, model_type, args):
         self.args = args
         self.obs_shape = obs_shape
         self.action_shape = action_shape
         self.epsilon = args.epsilon
-        if len(obs_shape)>1:
-            self.model_type = "CNN"
-        else:
-            self.model_type = "DNN"
+        self.model_type = model_type
         if self.model_type == "CNN":
             conv1 = tf.keras.layers.Conv2D(16, 5, strides=(3, 3), input_shape=obs_shape)
             pool1 = tf.keras.layers.MaxPooling2D()
@@ -38,7 +35,7 @@ class DQN:
 
     def act(self, obs):
         q = self.forward(obs)
-        if np.random.random()<self.epsilon:
+        if np.random.random()>self.epsilon:
             action = tf.math.argmax(q, axis=-1).numpy()
         else:
             action = np.random.randint(0, high=self.action_shape)
@@ -74,15 +71,12 @@ class DQN:
         return q_loss.numpy().tolist(), tf.math.reduce_mean(q_a).numpy().tolist()
 
 class DDQN:
-    def __init__(self, obs_shape, action_shape, args):
+    def __init__(self, obs_shape, action_shape, model_type, args):
         self.args = args
         self.obs_shape = obs_shape
         self.action_shape = action_shape
         self.epsilon = args.epsilon
-        if len(obs_shape)>1:
-            self.model_type = "CNN"
-        else:
-            self.model_type = "DNN"
+        self.model_type = model_type
         if self.model_type == "CNN":
             conv1 = tf.keras.layers.Conv2D(16, 5, strides=(3, 3), input_shape=obs_shape)
             pool1 = tf.keras.layers.MaxPooling2D()
@@ -93,10 +87,11 @@ class DDQN:
             fc2 = tf.keras.layers.Dense(action_shape)
             self.q1 = tf.keras.Sequential([conv1, pool1, conv2, pool2, flat, fc1, fc2])
         else:
+            flat = tf.keras.layers.Flatten()
             fc1 = tf.keras.layers.Dense(128, activation='relu')
             fc2 = tf.keras.layers.Dense(128, activation='relu')
             fc3 = tf.keras.layers.Dense(action_shape)
-            self.q1 = tf.keras.Sequential([fc1, fc2, fc3])
+            self.q1 = tf.keras.Sequential([flat, fc1, fc2, fc3])
         self.q2 = tf.keras.models.clone_model(self.q1)
         self.optimizer = tf.keras.optimizers.Adam(args.lr)
         self.loss = tf.keras.losses.MeanSquaredError()
@@ -114,7 +109,7 @@ class DDQN:
         q1, q2 = self.forward(obs)
         qs = tf.squeeze(tf.stack([q1, q2]), axis=1)
         qmean = tf.math.reduce_mean(qs, axis=0)
-        if np.random.random()<self.epsilon:
+        if np.random.random()>self.epsilon:
             action = tf.math.argmax(qmean, axis=-1).numpy()
         else:
             action = np.random.randint(0, high=self.action_shape)
