@@ -4,12 +4,13 @@ import cv2
 import tensorflow as tf 
 import argparse
 from ddqn import DDQN, DQN
+from predictor import Predictor
 from buffer import FullReplayMemory
 import itertools
 import time
 import datetime
 # tf.debugging.set_log_device_placement(True)
-def make_obs_memory(obs, size=(84, 84)):
+def make_obs_memory(obs, size=(80, 80)):
     obs_cv = cv2.cvtColor(obs, cv2.COLOR_RGB2GRAY)
     obs_resized = cv2.resize(obs_cv, dsize=size, interpolation=cv2.INTER_CUBIC)
     return obs_resized
@@ -20,6 +21,18 @@ def make_obs_network(obs, memory):
     obs_stack = np.concatenate([obs_stack, obs], axis=-1)
     obs_stack = np.expand_dims(obs_stack, axis=0)
     return obs_stack
+
+def make_data_predictor(obs, memory, action_shape):
+    obs = np.expand_dims(obs, axis=-1)
+    obs = np.expand_dims(obs, axis=0)
+    obs_stack = memory.last_obs(frames=5)
+    obs_stack = np.expand_dims(obs_stack, axis=0)  
+    a = memory.last_action()
+    a = int(a)
+    action = np.zeros(action_shape)
+    action[a] = 1. 
+    action = np.expand_dims(action, axis=0)
+    return obs_stack, obs, action  
 
 gpus = tf.config.experimental.list_physical_devices('GPU')
 if gpus:
@@ -55,7 +68,7 @@ obs_shape_list = env.observation_space.shape
 action_shape = env.action_space.n
 
 if len(obs_shape_list)>1:
-    shapes = [(84, 84), (1,), (1,), (1,), (84, 84)]
+    shapes = [(80, 80), (1,), (1,), (1,), (80, 80)]
     dtypes = [np.uint8, np.uint8, np.float32, np.bool, np.uint8]
     model_type = "CNN"
 else:
@@ -63,8 +76,9 @@ else:
     dtypes = [np.float32, np.uint8, np.float32, np.bool, np.float32]
     model_type = "DNN"
 qnet = DDQN(shapes[0]+(args.frames,), action_shape, model_type, args)
+pred = Predictor(shapes[0], (action_shape,), args)
 kws = ['obs', 'action', 'reward', 'done', 'new_obs']
-memory = FullReplayMemory(args.buffer_size, kws, shapes, dtypes, args.frames)
+memory = FullReplayMemory(args.buffer_size, kws, shapes, dtypes)
 writer = tf.summary.create_file_writer("logs/{}_{}".format(args.scenario, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
 
 total_numsteps = 0
@@ -90,6 +104,9 @@ with writer.as_default():
                 tf.summary.scalar("parameters/epsilon", epsilon, step=timestep)
                 writer.flush()
             obs_net = make_obs_network(obs, memory)
+            if timestep > args.startup_steps:
+                obs_hist, obs_pres, last_action = make_data_predictor(obs, memory, action_shape)
+                iu, ic, m = pred.forward(obs_hist, obs_pres, last_action)
             if model_type == "CNN":
                 obs_net = obs_net/255.
             action = qnet.act(obs_net)

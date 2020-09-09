@@ -21,7 +21,7 @@ class ReplayMemory:
         return len(self.buffer)
 
 class FullReplayMemory(ReplayMemory):
-    def __init__(self, capacity, kws, shapes, dtypes, frames):
+    def __init__(self, capacity, kws, shapes, dtypes):
         super(FullReplayMemory, self).__init__()
         self.capacity = int(capacity)
         self.obs_shape = list(shapes[0])
@@ -30,7 +30,6 @@ class FullReplayMemory(ReplayMemory):
         self.kws = kws
         for i in range(len(kws)):
             self.buffer[kws[i]] = np.zeros((self.capacity,) + shapes[i], dtype=dtypes[i])
-        self.n = frames
 
     def push(self, **kwargs):
         for key in kwargs:
@@ -39,17 +38,17 @@ class FullReplayMemory(ReplayMemory):
         self.position = int((self.position + 1) % self.capacity)
         self.count = max(self.count, self.position)
 
-    def sample(self, batch_size):
+    def sample(self, batch_size, frames=4):
         indices = np.random.choice(self.count, batch_size, replace=False)
         batch = dict()
         for kw in self.kws:
             if kw not in ['obs', 'new_obs']:
                 batch[kw] = self.buffer[kw][indices]
             else:
-                obs = np.zeros([batch_size] + self.obs_shape + [self.n])
+                obs = np.zeros([batch_size] + self.obs_shape + [frames])
                 obs[...,-1] = self.buffer[kw][indices]
                 valid = [True for _ in range(batch_size)]
-                for i in range(-1, -self.n, -1):
+                for i in range(-1, -frames, -1):
                     for j in range(indices.shape[0]):
                         if indices[j]+i<0:
                             obs[j,...,i-1] = self.obs_default
@@ -71,10 +70,10 @@ class FullReplayMemory(ReplayMemory):
         self.count
         self.batch = None
 
-    def last_obs(self, axis=0):
+    def last_obs(self, frames=4):
         obs = []
         another = False
-        for i in range(self.position-1, self.position-self.n, -1):
+        for i in range(self.position-1, self.position-frames, -1):
             if i<0:
                 obs.insert(0, self.obs_default)
             else:
@@ -84,9 +83,13 @@ class FullReplayMemory(ReplayMemory):
                     obs.insert(0, self.obs_default)
                 else:
                     obs.insert(0, self.buffer['obs'][i])
-        assert len(obs) == self.n-1
+        assert len(obs) == frames-1
         if len(obs)>0:
             samples = np.stack(obs, axis=-1)
         else:
             samples = np.zeros(self.obs_shape+[0], dtype=np.uint8)
         return samples
+
+    def last_action(self):
+        a = self.buffer['action'][self.position-1]
+        return a
