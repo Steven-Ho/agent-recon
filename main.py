@@ -85,7 +85,7 @@ with writer.as_default():
             timestep += 1
             
             if timestep % 200000 == 1:
-                epsilon /= 2.
+                epsilon = max(epsilon/2., 0.005)
                 qnet.set_epsilon(epsilon)
                 tf.summary.scalar("parameters/epsilon", epsilon, step=timestep)
                 writer.flush()
