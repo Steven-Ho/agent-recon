@@ -90,7 +90,7 @@ class Predictor:
         output2 = deco6(x)
 
         input3 = tf.keras.Input(shape=obs_shape + (1,))
-        x = conv4(x)
+        x = conv4(input3)
         x = nonl11(x)
         x = conv5(x)
         x = nonl12(x)
@@ -117,6 +117,7 @@ class Predictor:
 
         self.action_pred = tf.keras.Sequential([conv7, nonl17, conv8, nonl18, flat, linr2, smax])
 
+        self.optimizer = tf.keras.optimizers.Adam(args.lr)
 
     @tf.function
     def forward(self, obs_hist, obs, action):
@@ -146,12 +147,25 @@ class Predictor:
 
         new_obs = new_obs[...,-1]
         new_obs = np.expand_dims(new_obs, axis=-1)
-        iu, ic, m = self.forward(obs, new_obs, a)
         old_obs = obs[...,-1]
-        old_obs = np.expand_dims(old_obs)
-        old_m = self.get_mask(old_obs)
+        old_obs = np.expand_dims(old_obs, axis=-1)
 
         # train action prediction model
 
         # train iamge and mask model
-        
+        mse_loss = tf.keras.losses.MeanSquaredError()
+        abs_loss = tf.keras.losses.MeanAbsoluteError()
+        with tf.GradientTape() as tape:
+            iu, ic, m = self.forward(obs, new_obs, a)
+            # old_m = self.get_mask(old_obs)
+            x1 = tf.math.multiply(m, new_obs)
+            x2 = tf.math.multiply(1-m, new_obs)
+            loss_masked = mse_loss(ic, x1) + mse_loss(iu, x2)
+            loss_recon = mse_loss(new_obs, ic+iu)
+            loss_reg = abs_loss(0, m)
+            loss_all = loss_masked + loss_recon + 0.01*loss_reg
+
+        gradients = tape.gradient(loss_all, self.image.trainable_variables+self.mask.trainable_variables)
+        self.optimizer.apply_gradients(zip(gradients, self.image.trainable_variables+self.mask.trainable_variables))
+
+        return loss_all.numpy().tolist()

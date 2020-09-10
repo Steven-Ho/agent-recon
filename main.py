@@ -54,7 +54,7 @@ parser.add_argument('--buffer_size', type=int, default=1e6, help='maximum size f
 parser.add_argument('--update_interval', type=int, default=10, help='update q network for every N steps')
 parser.add_argument('--startup_steps', type=int, default=10000, help='initial rollout steps before training')
 parser.add_argument('--batch_size', type=int, default=256, help='sample size for training')
-parser.add_argument('--hidden_size', type=int, default=256, help='hidden unit number for network')
+parser.add_argument('--hidden_size', type=int, default=512, help='hidden unit number for network')
 parser.add_argument('--lr', type=float, default=0.00025, help='learning rate for q networks')
 parser.add_argument('--render', action='store_true', help='render or not')
 parser.add_argument('--frames', type=int, default=4, help='N frames for q network')
@@ -76,7 +76,7 @@ else:
     dtypes = [np.float32, np.uint8, np.float32, np.bool, np.float32]
     model_type = "DNN"
 qnet = DDQN(shapes[0]+(args.frames,), action_shape, model_type, args)
-pred = Predictor(shapes[0], (action_shape,), args)
+pred = Predictor(shapes[0], action_shape, args)
 kws = ['obs', 'action', 'reward', 'done', 'new_obs']
 memory = FullReplayMemory(args.buffer_size, kws, shapes, dtypes)
 writer = tf.summary.create_file_writer("logs/{}_{}".format(args.scenario, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
@@ -104,9 +104,9 @@ with writer.as_default():
                 tf.summary.scalar("parameters/epsilon", epsilon, step=timestep)
                 writer.flush()
             obs_net = make_obs_network(obs, memory)
-            if timestep > args.startup_steps:
-                obs_hist, obs_pres, last_action = make_data_predictor(obs, memory, action_shape)
-                iu, ic, m = pred.forward(obs_hist, obs_pres, last_action)
+            # if timestep > args.startup_steps:
+            #     obs_hist, obs_pres, last_action = make_data_predictor(obs, memory, action_shape)
+            #     iu, ic, m = pred.forward(obs_hist, obs_pres, last_action)
             if model_type == "CNN":
                 obs_net = obs_net/255.
             action = qnet.act(obs_net)

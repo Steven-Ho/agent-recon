@@ -9,14 +9,16 @@ class DQN:
         self.epsilon = args.epsilon
         self.model_type = model_type
         if self.model_type == "CNN":
-            conv1 = tf.keras.layers.Conv2D(16, 5, strides=(3, 3), input_shape=obs_shape)
-            pool1 = tf.keras.layers.MaxPooling2D()
-            conv2 = tf.keras.layers.Conv2D(32, 3, strides=(1, 1))
-            pool2 = tf.keras.layers.MaxPooling2D()
+            conv1 = tf.keras.layers.Conv2D(32, 8, strides=(4, 4), input_shape=obs_shape, padding='same')
+            nonl1 = tf.keras.layers.LeakyReLU()
+            conv2 = tf.keras.layers.Conv2D(32, 4, strides=(2, 2), padding='same')
+            nonl2 = tf.keras.layers.LeakyReLU()
+            conv3 = tf.keras.layers.Conv2D(64, 3, padding='same')
+            nonl3 = tf.keras.layers.LeakyReLU()
             flat = tf.keras.layers.Flatten()
             fc1 = tf.keras.layers.Dense(args.hidden_size, activation='relu')
             fc2 = tf.keras.layers.Dense(action_shape)
-            self.q = tf.keras.Sequential([conv1, pool1, conv2, pool2, flat, fc1, fc2])
+            self.q = tf.keras.Sequential([conv1, nonl1, conv2, nonl2, conv3, nonl3, flat, fc1, fc2])
         else:
             fc1 = tf.keras.layers.Dense(args.hidden_size, activation='relu')
             fc2 = tf.keras.layers.Dense(args.hidden_size, activation='relu')
