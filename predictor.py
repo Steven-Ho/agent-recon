@@ -136,12 +136,12 @@ class Predictor:
         return probs
 
     def update(self, samples):
-        obs, action, reward, done, new_obs = samples
+        obs, action, _, _, new_obs = samples
         obs = obs.astype('float32')
         new_obs = new_obs.astype('float32')
-        done = done.astype(float)
+        action = action.astype('int32')
 
-        a = np.zeros((self.args.batch_size, self.args.action_shape))
+        a = np.zeros((self.args.batch_size, self.action_shape))
         for i in range(self.args.batch_size):
             a[i, action[i]] = 1.0
 
@@ -151,21 +151,33 @@ class Predictor:
         old_obs = np.expand_dims(old_obs, axis=-1)
 
         # train action prediction model
+        with tf.GradientTape(persistent=True) as tape:
+            old_m = self.get_mask(old_obs)
+            m = self.get_mask(new_obs)
+            ms = tf.concat([old_m, m], axis=-1)
+            ap = self.action_infer(ms)
+            ap = tf.math.log(ap)
+            loss_ap = tf.reduce_mean(-tf.gather_nd(ap, action, batch_dims=1))
+        
+        gradients = tape.gradient(loss_ap, self.action_pred.trainable_variables)
+        self.optimizer.apply_gradients(zip(gradients, self.action_pred.trainable_variables))
+
+        gradients = tape.gradient(loss_ap, self.mask.trainable_variables)
+        self.optimizer.apply_gradients(zip(gradients, self.mask.trainable_variables))
 
         # train iamge and mask model
         mse_loss = tf.keras.losses.MeanSquaredError()
         abs_loss = tf.keras.losses.MeanAbsoluteError()
         with tf.GradientTape() as tape:
             iu, ic, m = self.forward(obs, new_obs, a)
-            # old_m = self.get_mask(old_obs)
             x1 = tf.math.multiply(m, new_obs)
             x2 = tf.math.multiply(1-m, new_obs)
             loss_masked = mse_loss(ic, x1) + mse_loss(iu, x2)
             loss_recon = mse_loss(new_obs, ic+iu)
             loss_reg = abs_loss(0, m)
-            loss_all = loss_masked + loss_recon + 0.01*loss_reg
+            loss_all = loss_masked + loss_recon + 0.001*loss_reg
 
         gradients = tape.gradient(loss_all, self.image.trainable_variables+self.mask.trainable_variables)
         self.optimizer.apply_gradients(zip(gradients, self.image.trainable_variables+self.mask.trainable_variables))
 
-        return loss_all.numpy().tolist()
+        return loss_all.numpy().tolist(), loss_ap.numpy().tolist(), loss_masked.numpy().tolist(), loss_recon.numpy().tolist(), loss_reg.numpy().tolist()

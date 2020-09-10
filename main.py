@@ -55,7 +55,7 @@ parser.add_argument('--update_interval', type=int, default=10, help='update q ne
 parser.add_argument('--startup_steps', type=int, default=10000, help='initial rollout steps before training')
 parser.add_argument('--batch_size', type=int, default=32, help='sample size for training')
 parser.add_argument('--hidden_size', type=int, default=512, help='hidden unit number for network')
-parser.add_argument('--lr', type=float, default=0.001, help='learning rate for q networks')
+parser.add_argument('--lr', type=float, default=0.00025, help='learning rate for q networks')
 parser.add_argument('--render', action='store_true', help='render or not')
 parser.add_argument('--frames', type=int, default=4, help='N frames for q network')
 args = parser.parse_args()
@@ -125,6 +125,13 @@ with writer.as_default():
                     lq, qs = qnet.update((obs_b, action_b, reward_b, done_b, new_obs_b))
                     tf.summary.scalar("loss/q", lq, step=timestep)
                     tf.summary.scalar("values/q", qs, step=timestep)
+
+                    loss_all, loss_ap, loss_masked, loss_recon, loss_reg = pred.update((obs_b, action_b, reward_b, done_b, new_obs_b))
+                    tf.summary.scalar("loss/all", loss_all, step=timestep)
+                    tf.summary.scalar("loss/ap", loss_ap, step=timestep)
+                    tf.summary.scalar("loss/masked", loss_masked, step=timestep)
+                    tf.summary.scalar("loss/recon", loss_recon, step=timestep)
+                    tf.summary.scalar("loss/reg", loss_reg, step=timestep)
                     writer.flush()
 
             episode_reward += reward
