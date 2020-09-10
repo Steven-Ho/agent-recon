@@ -24,7 +24,7 @@ class DQN:
             fc2 = tf.keras.layers.Dense(args.hidden_size, activation='relu')
             fc3 = tf.keras.layers.Dense(action_shape)
             self.q = tf.keras.Sequential([fc1, fc2, fc3])
-        self.optimizer = tf.keras.optimizers.Adam(args.lr)
+        self.optimizer = tf.keras.optimizers.RMSprop(args.lr)
         self.loss = tf.keras.losses.MeanSquaredError()        
 
     @tf.function
