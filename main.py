@@ -53,11 +53,13 @@ parser.add_argument('--epsilon', type=float, default=0.2, help='epsilon-greedy p
 parser.add_argument('--buffer_size', type=int, default=1e6, help='maximum size for replay buffer')
 parser.add_argument('--update_interval', type=int, default=10, help='update q network for every N steps')
 parser.add_argument('--startup_steps', type=int, default=10000, help='initial rollout steps before training')
-parser.add_argument('--batch_size', type=int, default=32, help='sample size for training')
+parser.add_argument('--batch_size', type=int, default=256, help='sample size for training')
 parser.add_argument('--hidden_size', type=int, default=512, help='hidden unit number for network')
 parser.add_argument('--lr', type=float, default=0.00025, help='learning rate for q networks')
 parser.add_argument('--render', action='store_true', help='render or not')
 parser.add_argument('--frames', type=int, default=4, help='N frames for q network')
+parser.add_argument('--optimizer', type=str, default='adam', help='support Adam and RMSProp')
+parser.add_argument('--predictor', action='store_true', help='enable predictor network')
 args = parser.parse_args()
 
 env = gym.make(args.scenario)
@@ -98,15 +100,16 @@ with writer.as_default():
         for t in range(args.max_episode_len):
             timestep += 1
             
-            if timestep % 200000 == 1:
+            if timestep % 500000 == 1:
                 epsilon = max(epsilon/2., 0.005)
                 qnet.set_epsilon(epsilon)
                 tf.summary.scalar("parameters/epsilon", epsilon, step=timestep)
                 writer.flush()
             obs_net = make_obs_network(obs, memory)
-            # if timestep > args.startup_steps:
-            #     obs_hist, obs_pres, last_action = make_data_predictor(obs, memory, action_shape)
-            #     iu, ic, m = pred.forward(obs_hist, obs_pres, last_action)
+            if args.predictor:
+                if timestep > args.startup_steps:
+                    obs_hist, obs_pres, last_action = make_data_predictor(obs, memory, action_shape)
+                    iu, ic, m = pred.forward(obs_hist, obs_pres, last_action)
             if model_type == "CNN":
                 obs_net = obs_net/255.
             action = qnet.act(obs_net)
@@ -125,13 +128,13 @@ with writer.as_default():
                     lq, qs = qnet.update((obs_b, action_b, reward_b, done_b, new_obs_b))
                     tf.summary.scalar("loss/q", lq, step=timestep)
                     tf.summary.scalar("values/q", qs, step=timestep)
-
-                    loss_all, loss_ap, loss_masked, loss_recon, loss_reg = pred.update((obs_b, action_b, reward_b, done_b, new_obs_b))
-                    tf.summary.scalar("loss/all", loss_all, step=timestep)
-                    tf.summary.scalar("loss/ap", loss_ap, step=timestep)
-                    tf.summary.scalar("loss/masked", loss_masked, step=timestep)
-                    tf.summary.scalar("loss/recon", loss_recon, step=timestep)
-                    tf.summary.scalar("loss/reg", loss_reg, step=timestep)
+                    if args.predictor:
+                        loss_all, loss_ap, loss_masked, loss_recon, loss_reg = pred.update((obs_b, action_b, reward_b, done_b, new_obs_b))
+                        tf.summary.scalar("loss/all", loss_all, step=timestep)
+                        tf.summary.scalar("loss/ap", loss_ap, step=timestep)
+                        tf.summary.scalar("loss/masked", loss_masked, step=timestep)
+                        tf.summary.scalar("loss/recon", loss_recon, step=timestep)
+                        tf.summary.scalar("loss/reg", loss_reg, step=timestep)
                     writer.flush()
 
             episode_reward += reward
