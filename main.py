@@ -44,7 +44,7 @@ if gpus:
     except RuntimeError as e:
         print(e)
 parser = argparse.ArgumentParser(description='Duoble DQN Baseline')
-parser.add_argument('--scenario', type=str, default="Centipede-v0", help="environment (default: Seaquest-v0)")
+parser.add_argument('--scenario', type=str, default="Centipede-ram-v0", help="environment (default: Seaquest-v0)")
 parser.add_argument('--seed', type=int, default=123, help="random seed for env")
 parser.add_argument('--num_episodes', type=int, default=40000, help='number of episodes for training')
 parser.add_argument('--max_episode_len', type=int, default=5000, help='maximum episode length')
@@ -78,7 +78,8 @@ else:
     dtypes = [np.float32, np.uint8, np.float32, np.bool, np.float32]
     model_type = "DNN"
 qnet = DDQN(shapes[0]+(args.frames,), action_shape, model_type, args)
-pred = Predictor(shapes[0], action_shape, args)
+if args.predictor:
+    pred = Predictor(shapes[0], action_shape, args)
 kws = ['obs', 'action', 'reward', 'done', 'new_obs']
 memory = FullReplayMemory(args.buffer_size, kws, shapes, dtypes)
 writer = tf.summary.create_file_writer("logs/{}_{}".format(args.scenario, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
