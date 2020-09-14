@@ -33,8 +33,7 @@ class FullReplayMemory(ReplayMemory):
 
     def push(self, **kwargs):
         for key in kwargs:
-            if len(self.buffer) < self.capacity:
-                self.buffer[key][self.position] = kwargs[key]
+            self.buffer[key][self.position] = kwargs[key]
         self.position = int((self.position + 1) % self.capacity)
         self.count = max(self.count, self.position)
 
@@ -67,7 +66,7 @@ class FullReplayMemory(ReplayMemory):
         for key in self.kws:
             self.buffer[key] = []
         self.position = 0
-        self.count
+        self.count = 0
         self.batch = None
 
     def last_obs(self, frames=4):
