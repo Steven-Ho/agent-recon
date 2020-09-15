@@ -129,7 +129,7 @@ class DDQN:
         action = tf.expand_dims(action, axis=-1)
         return action, q
 
-    def update(self, samples):
+    def update(self, samples, timestep):
         obs, action, reward, done, new_obs = samples
         obs = obs.astype('float32')
         new_obs = new_obs.astype('float32')
@@ -151,6 +151,10 @@ class DDQN:
             q_loss = self.loss(q_target, q_a)
 
         gradients = tape.gradient(q_loss, self.q1.trainable_variables + self.q2.trainable_variables)
+        if self.args.grad_clip:
+            gradients = [tf.clip_by_value(g, -1.0, 1.0) for g in gradients]
+        # for i in range(len(gradients)):
+        #     tf.summary.histogram('grads/{}'.format(i), gradients[i], step=timestep)
         self.optimizer.apply_gradients(zip(gradients, self.q1.trainable_variables + self.q2.trainable_variables))
 
         return q_loss.numpy().tolist(), tf.math.reduce_mean(q_a).numpy().tolist()

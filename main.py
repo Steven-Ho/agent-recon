@@ -44,7 +44,7 @@ if gpus:
     except RuntimeError as e:
         print(e)
 parser = argparse.ArgumentParser(description='Duoble DQN Baseline')
-parser.add_argument('--scenario', type=str, default="Centipede-ram-v0", help="environment (default: Seaquest-v0)")
+parser.add_argument('--scenario', type=str, default="Centipede-v0", help="environment (default: Seaquest-v0)")
 parser.add_argument('--seed', type=int, default=123, help="random seed for env")
 parser.add_argument('--num_episodes', type=int, default=40000, help='number of episodes for training')
 parser.add_argument('--max_episode_len', type=int, default=5000, help='maximum episode length')
@@ -60,6 +60,7 @@ parser.add_argument('--render', action='store_true', help='render or not')
 parser.add_argument('--frames', type=int, default=4, help='N frames for q network')
 parser.add_argument('--optimizer', type=str, default='adam', help='support Adam and RMSProp')
 parser.add_argument('--predictor', action='store_true', help='enable predictor network')
+parser.add_argument('--grad_clip', action='store_false', help='clip gradient values, default true')
 args = parser.parse_args()
 
 env = gym.make(args.scenario)
@@ -126,7 +127,7 @@ with writer.as_default():
             if timestep > args.startup_steps:
                 if timestep % args.update_interval == 0:
                     obs_b, action_b, reward_b, done_b, new_obs_b = memory.sample(args.batch_size)
-                    lq, qs = qnet.update((obs_b, action_b, reward_b, done_b, new_obs_b))
+                    lq, qs = qnet.update((obs_b, action_b, reward_b, done_b, new_obs_b), timestep)
                     tf.summary.scalar("loss/q", lq, step=timestep)
                     tf.summary.scalar("values/q", qs, step=timestep)
                     if args.predictor:
